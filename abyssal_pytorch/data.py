@@ -15,13 +15,12 @@ class MegaDataset(Dataset):
 
     def __getitem__(self, idx):
         r = self.df[idx]
-        pos, aa_mut = int(r.mut_type[1:-1]), r.mut_type[-1]
 
         return {
             'seq': r['wt_seq'],
-            'pos': pos,
-            'aa_mut': aa_mut,
-            'label': r['ddG_ML'],
+            'pos': r['pos'],
+            'aa_mut': r['aa_mut'],
+            'label': torch.tensor([r['ddG_ML']]).float(),
         }
 
 if __name__ == '__main__':

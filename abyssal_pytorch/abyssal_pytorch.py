@@ -22,8 +22,7 @@ class LightAttention(nn.Module):
 class Abyssal(nn.Module):
     def __init__(self):
         super().__init__()
-        self.embedder, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
-        self.batch_converter = alphabet.get_batch_converter()
+        self.embedder, self.batch_converter = self._load_esm_embedder_batch_converter()
         
         self.light_attention = LightAttention()
         self.fc_block = nn.Sequential(
@@ -33,19 +32,29 @@ class Abyssal(nn.Module):
             nn.ReLU(),  # Not sure
             nn.Linear(1024, 1),
         )
+    
+    def _load_esm_embedder_batch_converter(self):
+        embedder, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+        embedder.eval()
+        embedder = embedder.cuda()
+        batch_converter = alphabet.get_batch_converter()
+
+        return embedder, batch_converter
 
     def forward(self, seq, pos, aa_mut):
         bsz = len(seq)
         seq_orig, seq_mut = seq, map(mutate, seq, pos, aa_mut)
 
         data = [('seq_orig', o) for o in seq_orig] + [('seq_mut', m) for m in seq_mut]
-        batch_labels, batch_strs, batch_tokens = self.batch_converter(data)
+        _, _, batch_tokens = self.batch_converter(data)
         
-        with torch.no_grad():
-            results = self.embedder(batch_tokens, repr_layers=[33], return_contacts=False)
+        batch_tokens = batch_tokens.to(pos.device)
+        results = self.embedder(batch_tokens, repr_layers=[33], return_contacts=False)
 
-        x_orig = results['representations'][33][:bsz][range(bsz), pos-1].unsqueeze(1)
-        x_mut = results['representations'][33][bsz:][range(bsz), pos-1].unsqueeze(1)
+        rep = results['representations'][33]
+
+        x_orig = rep[:bsz][range(bsz), pos-1].unsqueeze(1)
+        x_mut = rep[bsz:][range(bsz), pos-1].unsqueeze(1)
 
         x_orig, x_mut = map(self.light_attention, [x_orig, x_mut])
         x = torch.cat([x_orig, x_mut], dim=-1)
