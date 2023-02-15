@@ -23,6 +23,24 @@ mut_emb = torch.randn(1, 1280)   # ESM2 embedding for the mutated amino acid.
 out = model(wt_emb, mut_emb)  # (1, 1) predicted ddG.
 ```
 
+### Training from scratch
+Please refer to `note/data-preprocessing.ipynb` notebook for data preprocessing. Running this notebook will generate `mega.train.csv`, `mega.val.csv` and `mega.test.csv` containing metadata for model training and evaluation.
+
+For faster training, extract ESM2 embeddings and save them to the disk.
+```shell
+$ python prefetch_embeddings.py -i data/mega.train.csv -o data/embeddings
+$ python prefetch_embeddings.py -i data/mega.val.csv -o data/embeddings
+$ python prefetch_embeddings.py -i data/mega.test.csv -o data/embeddings
+```
+
+This will save embedding vectors in `.pt` format in `data/embeddings` directory.
+
+You can now train model.
+
+```shell
+$ python train.py
+```
+
 ## Citations
 
 ```bibtex
