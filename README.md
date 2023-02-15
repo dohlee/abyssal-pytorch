@@ -4,6 +4,25 @@
 
 Implementation of [Abyssal](https://www.biorxiv.org/content/10.1101/2022.12.31.522396v1.full), a deep neural network trained with a new "mega" dataset to predict the impact of an amino acid variant on protein stability.
 
+## Installation
+
+```shell
+pip install abyssal-pytorch
+```
+
+## Usage
+```python
+import torch
+from abyssal_pytorch import Abyssal
+
+model = Abyssal()
+
+wt_emb = torch.randn(1, 1280)    # ESM2 embedding for the wildtype amino acid.
+mut_emb = torch.randn(1, 1280)   # ESM2 embedding for the mutated amino acid.
+
+out = model(wt_emb, mut_emb)  # (1, 1) predicted ddG.
+```
+
 ## Citations
 
 ```bibtex
