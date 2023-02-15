@@ -41,8 +41,10 @@ for i in range(0, len(df), args.batch_size):
     h = result['representations'][33][range(len(batch)), _positions_0based].cpu().numpy()
 
     # Save embeddings to `{wt_name}_{pos}{aa_wt}.pt`.
-    for h, wt_name, pos, mut_type in zip(h, batch['WT_name'].values, batch['pos'].values, batch['mut_type'].values):
+    for h, wt_name, wt_seq, pos, mut_type in zip(h, batch['WT_name'].values, batch['wt_seq'], _positions_0based, batch['mut_type'].values):
         aa_wt = mut_type[0]
-        torch.save(h, f'{args.output_dir}/{wt_name}_{pos}{aa_wt}.pt')
+        assert aa_wt == wt_seq[pos], f'WT sequence mismatch: {aa_wt} != {wt_seq[pos]}, {wt_name}, {pos}, {mut_type}'
+
+        torch.save(h, f'{args.output_dir}/{wt_name}_{pos+1}{aa_wt}.pt')  # Save as 1-based.
 
     print(f'Processed {i + len(batch)} / {len(df)}')
