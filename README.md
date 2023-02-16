@@ -38,7 +38,7 @@ This will save embedding vectors in `.pt` format in `data/embeddings` directory.
 You can now train model.
 
 ```shell
-$ python -m abyssal_pytorch.train --train data/mega.train.csv --val data/mega.val.csv
+$ python -m abyssal_pytorch.train --train data/mega.train.csv --val data/mega.val.csv --emb-dir data/embeddings
 ```
 
 ## Citations
