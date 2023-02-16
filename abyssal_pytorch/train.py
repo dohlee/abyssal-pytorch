@@ -5,57 +5,66 @@ import torch.optim as optim
 import numpy as np
 import random
 import tqdm
+
 from torch.utils.data import Dataset, DataLoader
+from scipy.stats import pearsonr, spearmanr
 
 from abyssal_pytorch import Abyssal
-from data import MegaDataset
+from abyssal_pytorch.data import MegaDataset
 
-def train(model, train_loader, optimizer, criterion, log_interval, device):
+def train(model, train_loader, optimizer, criterion, metrics_f):
     model.train()
-    running_loss = 0.0
+    running_output, running_label = [], []
 
-    # Training loop with tqdm progressbar
+    # Training loop with progressbar.
     bar = tqdm.tqdm(train_loader, total=len(train_loader), leave=False)
     for idx, batch in enumerate(bar):
-        seq = batch['seq']
-        pos = batch['pos']
-        aa_mut = batch['aa_mut']
-        label = batch['label']
-
-        pos = pos.to(device)
-        label = label.to(device)
+        wt_emb, mut_emb = batch['wt_emb'].cuda(), batch['mut_emb'].cuda()
+        label = batch['label'].cuda().flatten()
 
         optimizer.zero_grad()
-        output = model(seq, pos, aa_mut).flatten()
+        output = model(wt_emb, mut_emb).flatten()
         loss = criterion(output, label)
         loss.backward()
         optimizer.step()
 
-        if idx % log_interval == 0:
-            bar.set_postfix(loss=f'{loss.item():.4f}')
+        running_output.append(output.detach().cpu())
+        running_label.append(label.detach().cpu())
 
-        running_loss += loss.item()
+        if idx % 100 == 0:
+            running_output = torch.cat(running_output, dim=0)
+            running_label = torch.cat(running_label, dim=0)
 
-    return running_loss / len(train_loader)
+            running_loss = criterion(running_output, running_label)
+            running_metrics = {k: f(running_output, running_label) for k, f in metrics_f.items()}
 
-def validate(model, val_loader, criterion, log_interval, device):
+            loss = running_loss.item()
+            pearson = running_metrics['pearson']
+            spearman = running_metrics['spearman']
+            bar.set_postfix(loss=loss, pearson=pearson, spearman=spearman)
+
+            running_output, running_label = [], []
+
+def validate(model, val_loader, criterion, metrics_f):
     model.eval()
-    running_loss = 0.0
+
+    out, label = [], []
     with torch.no_grad():
         for idx, batch in enumerate(val_loader):
-            seq = batch['seq']
-            pos = batch['pos']
-            aa_mut = batch['aa_mut']
-            label = batch['label']
+            wt_emb, mut_emb = batch['wt_emb'].cuda(), batch['mut_emb'].cuda()
+            _label = batch['label'].cuda().flatten()
 
-            pos = pos.to(device)
-            label = label.to(device)
+            _out = model(wt_emb, mut_emb).flatten()
+            out.append(_out.cpu())
+            label.append(_label.cpu())
+        
+    out = torch.cat(out, dim=0)
+    label = torch.cat(label, dim=0)
 
-            output = model(seq, pos, aa_mut).flatten()
-            loss = criterion(output, label)
+    loss = criterion(out, label)
+    metrics = {k: f(out, label) for k, f in metrics_f.items()}
 
-            running_loss += loss.item()
-    return running_loss / len(val_loader)
+    return loss, metrics
 
 def seed_everything(seed):
     torch.manual_seed(seed)
@@ -63,8 +72,10 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
+
+    # Performance drops, so commenting out for now.
+    # torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.deterministic = True
 
 def freeze(model):
     for param in model.parameters():
@@ -75,40 +86,43 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch-size', type=int, default=64)
+    parser.add_argument('--train', required=True)
+    parser.add_argument('--val', required=True)
+    parser.add_argument('--emb-dir', required=True)
+    parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--epochs', type=int, default=72)
     parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--log-interval', type=int, default=10)
+    parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
 
     seed_everything(args.seed)
 
-    train_df = pd.read_csv('../data/mega.train.csv')
-    train_set = MegaDataset(train_df)
+    train_df = pd.read_csv(args.train)
+    train_set = MegaDataset(train_df, emb_dir=args.emb_dir)
 
-    val_df = pd.read_csv('../data/mega.val.csv')
-    val_set = MegaDataset(val_df)
+    val_df = pd.read_csv(args.val)
+    val_set = MegaDataset(val_df, emb_dir=args.emb_dir)
 
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, drop_last=True)
-    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, drop_last=False)
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, drop_last=True, num_workers=16, pin_memory=True)
+    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=16, pin_memory=True)
 
     model = Abyssal()
-    freeze(model.embedder)
-    model = model.to(args.device)
+    model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.97)
     criterion = nn.MSELoss()
 
+    metrics_f = {
+        'pearson': lambda x, y: pearsonr(x, y)[0],
+        'spearman': lambda x, y: spearmanr(x, y)[0],
+    }
+
     for epoch in range(args.epochs):
-        train_loss = train(model, train_loader, optimizer, criterion, args.log_interval, args.device)
-        val_loss = validate(model, val_loader, criterion, args.log_interval, args.device)
+        train(model, train_loader, optimizer, criterion, metrics_f)
+        val_loss, val_metrics = validate(model, val_loader, criterion, metrics_f)
 
-        if epoch % args.log_interval == 0:
-            print(f'Epoch {epoch}: train loss {train_loss:.4f}, val loss {val_loss:.4f}')
-
+        print(f'Epoch {epoch}: val loss {val_loss:.4f}, val pearson {val_metrics["pearson"]:.4f}, val spearman {val_metrics["spearman"]:.4f}')
         scheduler.step()
 
 if __name__ == '__main__':
