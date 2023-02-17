@@ -81,7 +81,7 @@ def validate(model, val_loader, criterion, metrics_f):
     metrics['delta'] = torch.cat([out_fwd, out_rev], dim=0).mean()
 
     wandb.log({
-        'val/loss': loss.item(),
+        'val/loss': loss,
         'val/pearson': metrics['pearson'],
         'val/spearman': metrics['spearman'],
         'val/pearson_fr': metrics['pearson_fr'],
@@ -122,7 +122,7 @@ def main():
     args = parser.parse_args()
 
     seed_everything(args.seed)
-    if not args.wandb:
+    if not args.use_wandb:
         os.environ['WANDB_MODE'] = 'disabled'
     
     wandb.init(project='abyssal-pytorch', config=args, reinit=True)
