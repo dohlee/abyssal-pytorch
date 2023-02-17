@@ -8,3 +8,4 @@ note/.ipynb_checkpoints/
 wandb/
 
 **/.snakemake
+tuning/results
