@@ -9,6 +9,7 @@ rule train:
     shell:
         'CUDA_VISIBLE_DEVICES=0 '
         'python -m abyssal_pytorch.train '
+        '-o {output} '
         '--train ../data/mega.train.csv '
         '--val ../data/mega.val.csv '
         '--emb-dir ../data/embeddings '
