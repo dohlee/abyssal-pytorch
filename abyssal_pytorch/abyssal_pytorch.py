@@ -15,7 +15,7 @@ class LightAttention(nn.Module):
         return self.att_conv(x).softmax(dim=-1) * self.feat_conv(x)
 
 class Abyssal(nn.Module):
-    def __init__(self, use_bn=True):
+    def __init__(self, use_bn=False):
         super().__init__()
         
         self.light_attention = LightAttention()

@@ -57,12 +57,12 @@ def validate(model, val_loader, criterion, metrics_f):
 
     out_fwd, out_rev, label = [], [], []
     with torch.no_grad():
-        for idx, batch in enumerate(val_loader):
+        for batch in val_loader:
             wt_emb, mut_emb = batch['wt_emb'].cuda(), batch['mut_emb'].cuda()
             _label = batch['label'].cuda().flatten()
 
             _out_fwd = model(wt_emb, mut_emb).flatten()
-            _out_rev = model(mut_emb, wt_emb).flatten()
+            _out_rev = model(mut_emb, wt_emb).flatten()  # Swap wt_emb and mut_emb.
 
             out_fwd.append(_out_fwd.cpu())
             out_rev.append(_out_rev.cpu())
@@ -100,10 +100,6 @@ def seed_everything(seed):
     # Performance drops, so commenting out for now.
     # torch.backends.cudnn.benchmark = False
     # torch.backends.cudnn.deterministic = True
-
-def freeze(model):
-    for param in model.parameters():
-        param.requires_grad = False
 
 def main():
     import pandas as pd
