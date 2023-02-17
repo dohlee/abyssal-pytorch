@@ -15,14 +15,16 @@ class LightAttention(nn.Module):
         return self.att_conv(x).softmax(dim=-1) * self.feat_conv(x)
 
 class Abyssal(nn.Module):
-    def __init__(self):
+    def __init__(self, use_bn=True):
         super().__init__()
         
         self.light_attention = LightAttention()
         self.fc_block = nn.Sequential(
             nn.Linear(2560, 2048),
+            nn.BatchNorm1d(2048) if use_bn else nn.Identity(),
             nn.ReLU(),  # Not sure
             nn.Linear(2048, 1024),
+            nn.BatchNorm1d(1024) if use_bn else nn.Identity(),
             nn.ReLU(),  # Not sure
             nn.Linear(1024, 1),
         )

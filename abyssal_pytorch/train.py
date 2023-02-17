@@ -5,6 +5,8 @@ import torch.optim as optim
 import numpy as np
 import random
 import tqdm
+import os
+import wandb
 
 from torch.utils.data import Dataset, DataLoader
 from scipy.stats import pearsonr, spearmanr
@@ -42,27 +44,49 @@ def train(model, train_loader, optimizer, criterion, metrics_f):
             pearson = running_metrics['pearson']
             spearman = running_metrics['spearman']
             bar.set_postfix(loss=loss, pearson=pearson, spearman=spearman)
+            wandb.log({
+                'train/loss': loss,
+                'train/pearson': pearson,
+                'train/spearman': spearman,
+            })
 
             running_output, running_label = [], []
 
 def validate(model, val_loader, criterion, metrics_f):
     model.eval()
 
-    out, label = [], []
+    out_fwd, out_rev, label = [], [], []
     with torch.no_grad():
         for idx, batch in enumerate(val_loader):
             wt_emb, mut_emb = batch['wt_emb'].cuda(), batch['mut_emb'].cuda()
             _label = batch['label'].cuda().flatten()
 
-            _out = model(wt_emb, mut_emb).flatten()
-            out.append(_out.cpu())
+            _out_fwd = model(wt_emb, mut_emb).flatten()
+            _out_rev = model(mut_emb, wt_emb).flatten()
+
+            out_fwd.append(_out_fwd.cpu())
+            out_rev.append(_out_rev.cpu())
+
             label.append(_label.cpu())
         
-    out = torch.cat(out, dim=0)
+    out_fwd = torch.cat(out_fwd, dim=0)
+    out_rev = torch.cat(out_rev, dim=0)
     label = torch.cat(label, dim=0)
 
-    loss = criterion(out, label)
-    metrics = {k: f(out, label) for k, f in metrics_f.items()}
+    loss = criterion(out_fwd, label).item()
+    metrics = {k: f(out_fwd, label) for k, f in metrics_f.items()}
+
+    # Add antisymmetry metrics.
+    metrics['pearson_fr'] = pearsonr(out_fwd, out_rev)[0] 
+    metrics['delta'] = torch.cat([out_fwd, out_rev], dim=0).mean()
+
+    wandb.log({
+        'val/loss': loss.item(),
+        'val/pearson': metrics['pearson'],
+        'val/spearman': metrics['spearman'],
+        'val/pearson_fr': metrics['pearson_fr'],
+        'val/delta': metrics['delta'],
+    })
 
     return loss, metrics
 
@@ -92,10 +116,16 @@ def main():
     parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--epochs', type=int, default=72)
     parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--use-bn', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--use-wandb', action='store_true', default=False)
     args = parser.parse_args()
 
     seed_everything(args.seed)
+    if not args.wandb:
+        os.environ['WANDB_MODE'] = 'disabled'
+    
+    wandb.init(project='abyssal-pytorch', config=args, reinit=True)
 
     train_df = pd.read_csv(args.train)
     train_set = MegaDataset(train_df, emb_dir=args.emb_dir)
@@ -122,7 +152,10 @@ def main():
         train(model, train_loader, optimizer, criterion, metrics_f)
         val_loss, val_metrics = validate(model, val_loader, criterion, metrics_f)
 
-        print(f'Epoch {epoch}: val loss {val_loss:.4f}, val pearson {val_metrics["pearson"]:.4f}, val spearman {val_metrics["spearman"]:.4f}')
+        message = f'Epoch {epoch} Validation: loss {val_loss:.4f},'
+        message += ', '.join([f'{k} {v:.4f}' for k, v in val_metrics.items()])
+        print(message)
+
         scheduler.step()
 
 if __name__ == '__main__':

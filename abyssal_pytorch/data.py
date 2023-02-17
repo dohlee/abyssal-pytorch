@@ -15,7 +15,7 @@ class MegaDataset(Dataset):
 
         print('Preloading embeddings..')
         wt_embs, mut_embs = [], []
-        for r in tqdm(self.df):
+        for r in tqdm(self.df, leave=False):
             wt_emb = torch.load(f'{self.emb_dir}/{r["WT_name"]}_{r["pos"]}{r["wt_seq"][r["pos"] - 1]}.pt')
             mut_emb = torch.load(f'{self.emb_dir}/{r["WT_name"]}_{r["pos"]}{r["aa_mut"]}.pt')
 
