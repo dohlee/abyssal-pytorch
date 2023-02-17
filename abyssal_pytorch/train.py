@@ -108,6 +108,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', required=True)
     parser.add_argument('--val', required=True)
+    parser.add_argument('--output', '-o', required=True)
     parser.add_argument('--emb-dir', required=True)
     parser.add_argument('--batch-size', type=int, default=128)
     parser.add_argument('--epochs', type=int, default=72)
@@ -144,15 +145,24 @@ def main():
         'spearman': lambda x, y: spearmanr(x, y)[0],
     }
 
+    best_val_loss = np.inf
     for epoch in range(args.epochs):
         train(model, train_loader, optimizer, criterion, metrics_f)
         val_loss, val_metrics = validate(model, val_loader, criterion, metrics_f)
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), args.output)
 
         message = f'Epoch {epoch} Validation: loss {val_loss:.4f},'
         message += ', '.join([f'{k} {v:.4f}' for k, v in val_metrics.items()])
         print(message)
 
         scheduler.step()
+    
+    wandb.summary({
+        'best_val_loss': best_val_loss,
+    })
 
 if __name__ == '__main__':
     main()

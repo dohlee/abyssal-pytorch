@@ -1,0 +1,16 @@
+bszs = [16, 32, 64, 128, 256, 512, 1024]
+
+rule all:
+    input: expand('results/{bsz}.pt', bsz=bszs)
+
+rule train:
+    output:
+        'results/{bsz}.pt'
+    shell:
+        'CUDA_VISIBLE_DEVICES=0 '
+        'python -m abyssal_pytorch.train '
+        '--train ../data/mega.train.csv '
+        '--val ../data/mega.val.csv '
+        '--emb-dir ../data/embeddings '
+        '--use-wandb '
+        '--batch-size {wildcards.bsz}'
