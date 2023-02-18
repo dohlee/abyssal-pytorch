@@ -7,7 +7,7 @@ Implementation of [Abyssal](https://www.biorxiv.org/content/10.1101/2022.12.31.5
 ## Installation
 
 ```shell
-pip install abyssal-pytorch
+$ pip install abyssal-pytorch
 ```
 
 ## Usage
@@ -38,8 +38,22 @@ This will save embedding vectors in `.pt` format in `data/embeddings` directory.
 You can now train model.
 
 ```shell
-$ python -m abyssal_pytorch.train --train data/mega.train.csv --val data/mega.val.csv --emb-dir data/embeddings
+$ python -m abyssal_pytorch.train --train data/mega.train.csv --val data/mega.val.csv --test data/mega.test.csv --emb-dir data/embeddings
 ```
+
+## Reproduction status
+
+Unfortuneately, I could not exactly reproduce the results based on the model and training specification in the current version of Abyssal preprint.
+Below is the results from my best effort so far. Any ideas to reproduce the model performance would be appreciated!
+
+|Metric|Target|Reproduced|
+|------|:----:|:--------:|
+Pearson's r|0.85+-0.00|0.7603|
+Spearman's r|0.81+-0.01|0.7683|
+MSE, kcal/mol|0.89|0.5984|
+Accuracy (?)|0.79|?|
+
+
 
 ## Citations
 
