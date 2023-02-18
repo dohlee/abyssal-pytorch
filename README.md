@@ -43,17 +43,17 @@ $ python -m abyssal_pytorch.train --train data/mega.train.csv --val data/mega.va
 
 ## Reproduction status
 
-Unfortuneately, I could not exactly reproduce the results based on the model and training specification in the current version of Abyssal preprint.
+Unfortunately, I could not exactly reproduce the results based on the model and training specification in the current version of Abyssal preprint.
 Below is the results from my best effort so far. Any ideas to reproduce the model performance would be appreciated!
 
 |Metric|Target|Reproduced|
 |------|:----:|:--------:|
-Pearson's r|0.85+-0.00|0.7603|
-Spearman's r|0.81+-0.01|0.7683|
-MSE, kcal/mol|0.89|0.5984|
+Pearson's r|0.85+-0.00|0.7661|
+Spearman's r|0.81+-0.01|0.7846|
+MSE, kcal/mol|0.89|0.6003|
 Accuracy (?)|0.79|?|
-
-
+PCC(f-r)|-0.98|-0.9611|
+delta|-0.01|-0.0330|
 
 ## Citations
 
