@@ -160,7 +160,7 @@ def main():
 
         scheduler.step()
     
-    wandb.summary({
+    wandb.log({
         'best_val_loss': best_val_loss,
     })
 
