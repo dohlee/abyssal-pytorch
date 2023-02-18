@@ -14,7 +14,7 @@ class LightAttention(nn.Module):
         return self.att_conv(x).softmax(dim=-1) * self.feat_conv(x)
 
 class Abyssal(nn.Module):
-    def __init__(self, use_bn=False):
+    def __init__(self, p_dropout=0.0, use_bn=False):
         super().__init__()
         
         self.light_attention = LightAttention()
@@ -22,9 +22,11 @@ class Abyssal(nn.Module):
             nn.Linear(2560, 2048),
             nn.BatchNorm1d(2048) if use_bn else nn.Identity(),
             nn.ReLU(),  # Not sure
+            nn.Dropout(p_dropout),
             nn.Linear(2048, 1024),
             nn.BatchNorm1d(1024) if use_bn else nn.Identity(),
             nn.ReLU(),  # Not sure
+            nn.Dropout(p_dropout),
             nn.Linear(1024, 1),
         )
 
